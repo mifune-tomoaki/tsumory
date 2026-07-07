@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: tsumory
+  threads:
+    virtual:
+      enabled: true
