@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+  <body>
+    <th:block th:fragment="layout(title, content)">
+      <!DOCTYPE html>
+      <html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title th:text="${title} + ' - Tsumory'">Tsumory</title>
+          <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+        </head>
+        <body>
+          <nav class="navbar navbar-dark bg-dark mb-4">
+            <div class="container">
+              <span class="navbar-brand mb-0 h1">Tsumory</span>
+              <form th:action="@{/logout}" method="post" sec:authorize="isAuthenticated()">
+                <input
+                  type="hidden"
+                  th:if="${_csrf != null}"
+                  th:name="${_csrf.parameterName}"
+                  th:value="${_csrf.token}"
+                />
+                <button type="submit" class="btn btn-outline-light btn-sm">ログアウト</button>
+              </form>
+            </div>
+          </nav>
+          <main class="container">
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
+            <div th:replace="${content}"></div>
+          </main>
+          <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+        </body>
+      </html>
+    </th:block>
+  </body>
+</html>

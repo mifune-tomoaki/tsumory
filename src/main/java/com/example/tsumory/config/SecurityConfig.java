@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -20,7 +21,8 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        .formLogin(form -> form.defaultSuccessUrl("/posts", true));
+        .formLogin(form -> form.loginPage("/login").defaultSuccessUrl("/posts", true))
+        .addFilterAfter(new RequestLoggingContextFilter(), SecurityContextHolderFilter.class);
     return http.build();
   }
 

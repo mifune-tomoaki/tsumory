@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+  <body>
+    <th:block th:replace="~{fragments/layout :: layout(title='今日のつぶやき', content=~{::section})}">
+      <section>
+        <form th:action="@{/posts}" th:object="${postForm}" method="post" class="mb-4">
+          <input
+            type="hidden"
+            th:if="${_csrf != null}"
+            th:name="${_csrf.parameterName}"
+            th:value="${_csrf.token}"
+          />
+          <div class="input-group">
+            <textarea
+              th:field="*{body}"
+              class="form-control"
+              maxlength="100"
+              rows="2"
+              placeholder="今日はどんな一日でしたか?"
+            ></textarea>
+            <button type="submit" class="btn btn-primary">投稿</button>
+          </div>
+          <div
+            th:if="${#fields.hasErrors('body')}"
+            class="text-danger small mt-1"
+            th:errors="*{body}"
+          ></div>
+        </form>
+
+        <div th:if="${posts.isEmpty()}" class="text-muted mb-4">まだ何も積もっていません</div>
+        <ul class="list-group mb-4" th:unless="${posts.isEmpty()}">
+          <li class="list-group-item" th:each="post : ${posts}">
+            <form
+              th:if="${editingPostId != null and editingPostId.equals(post.id())}"
+              th:action="@{/posts/{id}(id=${post.id()})}"
+              th:object="${editForm}"
+              method="post"
+            >
+              <input
+                type="hidden"
+                th:if="${_csrf != null}"
+                th:name="${_csrf.parameterName}"
+                th:value="${_csrf.token}"
+              />
+              <div class="text-muted small mb-1" th:text="${post.postedAt()}">00:00</div>
+              <textarea th:field="*{body}" class="form-control mb-2" maxlength="100" rows="2"></textarea>
+              <div
+                th:if="${#fields.hasErrors('body')}"
+                class="text-danger small mb-2"
+                th:errors="*{body}"
+              ></div>
+              <button type="submit" class="btn btn-primary btn-sm">保存</button>
+              <a th:href="@{/posts}" class="btn btn-outline-secondary btn-sm">キャンセル</a>
+            </form>
+
+            <div
+              th:unless="${editingPostId != null and editingPostId.equals(post.id())}"
+              class="d-flex justify-content-between align-items-start"
+            >
+              <div>
+                <div class="text-muted small" th:text="${post.postedAt()}">00:00</div>
+                <div th:text="${post.body()}">つぶやき本文</div>
+              </div>
+              <div class="d-flex gap-2">
+                <a th:href="@{/posts(edit=${post.id()})}" class="btn btn-outline-secondary btn-sm"
+                  >編集</a
+                >
+                <form
+                  th:action="@{/posts/{id}/delete(id=${post.id()})}"
+                  method="post"
+                  onsubmit="return confirm('このつぶやきを削除しますか?')"
+                >
+                  <input
+                    type="hidden"
+                    th:if="${_csrf != null}"
+                    th:name="${_csrf.parameterName}"
+                    th:value="${_csrf.token}"
+                  />
+                  <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
+                </form>
+              </div>
+            </div>
+          </li>
+        </ul>
+
+        <div th:if="${todayDiaryExists}">
+          <a th:href="@{/diary/{date}(date=${today})}" class="btn btn-outline-primary"
+            >今日の日記を見る</a
+          >
+        </div>
+        <div th:unless="${todayDiaryExists}">
+          <form th:action="@{/diaries/generate}" method="post" id="diary-generate-form">
+            <input
+              type="hidden"
+              th:if="${_csrf != null}"
+              th:name="${_csrf.parameterName}"
+              th:value="${_csrf.token}"
+            />
+            <button
+              type="submit"
+              class="btn btn-success"
+              id="diary-generate-button"
+              th:disabled="${posts.isEmpty()}"
+            >
+              今日の日記を作る
+            </button>
+          </form>
+          <div th:if="${posts.isEmpty()}" class="text-muted small mt-1">
+            つぶやきを投稿すると日記が作れます
+          </div>
+        </div>
+
+        <script>
+          const diaryGenerateForm = document.getElementById('diary-generate-form');
+          if (diaryGenerateForm) {
+            diaryGenerateForm.addEventListener('submit', function () {
+              const button = document.getElementById('diary-generate-button');
+              button.disabled = true;
+              button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>生成中…';
+            });
+          }
+        </script>
+      </section>
+    </th:block>
+  </body>
+</html>

@@ -1,6 +1,10 @@
 spring:
   application:
     name: tsumory
+  # 開発時、リポジトリ直下の.env(gitignore対象)から環境変数を読み込む。
+  # 存在しなくてもエラーにはならない(optional:)。ANTHROPIC_API_KEYなどを想定。
+  config:
+    import: optional:file:.env[.properties]
   threads:
     virtual:
       enabled: true
@@ -13,3 +17,12 @@ logging:
   level:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
+  pattern:
+    # reqId/userIdはRequestLoggingContextFilterがMDCに積む値。
+    # どのクラスのログでも、このパターンにより自動的にリクエスト・ユーザーを特定できる。
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [reqId=%X{requestId:-}, userId=%X{userId:-}] %logger{36} - %msg%n%wEx"
+
+tsumory:
+  ai:
+    model: claude-haiku-4-5
+    max-tokens: 2048

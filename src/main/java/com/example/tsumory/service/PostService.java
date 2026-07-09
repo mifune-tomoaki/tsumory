@@ -3,6 +3,7 @@ package com.example.tsumory.service;
 import com.example.tsumory.domain.Post;
 import com.example.tsumory.domain.User;
 import com.example.tsumory.repository.PostRepository;
+import com.example.tsumory.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,47 +20,48 @@ import org.springframework.transaction.annotation.Transactional;
 public class PostService {
 
   private final PostRepository postRepository;
+  private final UserRepository userRepository;
   private final Clock clock;
 
-  public List<Post> findTodayPosts(User user) {
+  public List<Post> findTodayPosts(Long userId) {
     LocalDate today = LocalDate.now(clock);
     Instant startOfDay = today.atStartOfDay(clock.getZone()).toInstant();
     Instant startOfNextDay = today.plusDays(1).atStartOfDay(clock.getZone()).toInstant();
     List<Post> posts =
         postRepository
             .findByUser_IdAndPostedAtGreaterThanEqualAndPostedAtLessThanOrderByPostedAtAsc(
-                user.getId(), startOfDay, startOfNextDay);
-    log.debug("Fetched {} posts for userId={} on {}", posts.size(), user.getId(), today);
+                userId, startOfDay, startOfNextDay);
+    log.debug("Fetched {} posts for userId={} on {}", posts.size(), userId, today);
     return posts;
   }
 
   @Transactional
-  public Post create(User user, String body) {
+  public Post create(Long userId, String body) {
+    User user = userRepository.getReferenceById(userId);
     Post saved = postRepository.save(new Post(user, body, clock.instant()));
     // 本文には個人的な内容が含まれるためログには文字数のみ出力する
-    log.info(
-        "Created post id={} for userId={} (length={})", saved.getId(), user.getId(), body.length());
+    log.info("Created post id={} for userId={} (length={})", saved.getId(), userId, body.length());
     return saved;
   }
 
   @Transactional
-  public void edit(User user, Long postId, String body) {
-    findOwnedPost(user, postId).edit(body);
-    log.info("Edited post id={} for userId={} (length={})", postId, user.getId(), body.length());
+  public void edit(Long userId, Long postId, String body) {
+    findOwnedPost(userId, postId).edit(body);
+    log.info("Edited post id={} for userId={} (length={})", postId, userId, body.length());
   }
 
   @Transactional
-  public void delete(User user, Long postId) {
-    postRepository.delete(findOwnedPost(user, postId));
-    log.info("Deleted post id={} for userId={}", postId, user.getId());
+  public void delete(Long userId, Long postId) {
+    postRepository.delete(findOwnedPost(userId, postId));
+    log.info("Deleted post id={} for userId={}", postId, userId);
   }
 
-  private Post findOwnedPost(User user, Long postId) {
+  public Post findOwnedPost(Long userId, Long postId) {
     return postRepository
-        .findByIdAndUserId(postId, user.getId())
+        .findByIdAndUserId(postId, userId)
         .orElseThrow(
             () -> {
-              log.warn("Post id={} not found or not owned by userId={}", postId, user.getId());
+              log.warn("Post id={} not found or not owned by userId={}", postId, userId);
               return new ResourceNotFoundException();
             });
   }
