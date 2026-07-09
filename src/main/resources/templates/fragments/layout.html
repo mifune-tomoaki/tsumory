@@ -14,15 +14,18 @@
           <nav class="navbar navbar-dark bg-dark mb-4">
             <div class="container">
               <span class="navbar-brand mb-0 h1">Tsumory</span>
-              <form th:action="@{/logout}" method="post" sec:authorize="isAuthenticated()">
-                <input
-                  type="hidden"
-                  th:if="${_csrf != null}"
-                  th:name="${_csrf.parameterName}"
-                  th:value="${_csrf.token}"
-                />
-                <button type="submit" class="btn btn-outline-light btn-sm">ログアウト</button>
-              </form>
+              <div class="d-flex gap-2" sec:authorize="isAuthenticated()">
+                <a th:href="@{/diaries}" class="btn btn-outline-light btn-sm">過去の日記</a>
+                <form th:action="@{/logout}" method="post">
+                  <input
+                    type="hidden"
+                    th:if="${_csrf != null}"
+                    th:name="${_csrf.parameterName}"
+                    th:value="${_csrf.token}"
+                  />
+                  <button type="submit" class="btn btn-outline-light btn-sm">ログアウト</button>
+                </form>
+              </div>
             </div>
           </nav>
           <main class="container">

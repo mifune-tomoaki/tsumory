@@ -5,6 +5,7 @@ import com.anthropic.errors.AnthropicException;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.example.tsumory.domain.Post;
+import com.example.tsumory.domain.PostCategory;
 import java.time.Clock;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -85,20 +86,23 @@ public class AnthropicDiaryWriter implements DiaryWriter {
   }
 
   private String buildUserMessage(List<Post> posts) {
-    String timeline =
-        posts.stream()
-            .map(
-                post ->
-                    "%s %s"
-                        .formatted(
-                            POSTED_AT_FORMAT.withZone(clock.getZone()).format(post.getPostedAt()),
-                            post.getBody()))
-            .collect(Collectors.joining("\n"));
+    String timeline = posts.stream().map(this::formatPostLine).collect(Collectors.joining("\n"));
     return """
         以下は今日投稿されたつぶやきです。投稿時刻とともに時系列に並んでいます。
+        角括弧はAIによる分類カテゴリの参考情報であり、つぶやき本文そのものではありません。\
+        カテゴリ名を日記本文にそのまま書き写したり、カテゴリごとに整理して構成したりせず、\
+        あくまで文脈を読み取るための補助情報として扱ってください(未分類のつぶやきにはカテゴリを付けていません)。
         これらのつぶやきを1本の日記としてまとめてください。
 
         %s"""
         .formatted(timeline);
+  }
+
+  private String formatPostLine(Post post) {
+    String postedAt = POSTED_AT_FORMAT.withZone(clock.getZone()).format(post.getPostedAt());
+    PostCategory category = post.getCategory();
+    return category == null
+        ? "%s %s".formatted(postedAt, post.getBody())
+        : "%s [%s] %s".formatted(postedAt, category.getLabel(), post.getBody());
   }
 }

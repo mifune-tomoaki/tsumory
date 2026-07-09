@@ -11,14 +11,17 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Slf4j
@@ -28,6 +31,7 @@ public class DiaryController {
 
   private static final DateTimeFormatter GENERATED_AT_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+  private static final int PREVIEW_LENGTH = 80;
 
   private final DiaryService diaryService;
   private final PostService postService;
@@ -39,43 +43,82 @@ public class DiaryController {
       @PathVariable LocalDate date,
       @AuthenticationPrincipal TsumoryUserDetails principal,
       Model model) {
-    if (!date.equals(LocalDate.now(clock))) {
+    if (date.isAfter(LocalDate.now(clock))) {
       throw new ResourceNotFoundException();
     }
-    Diary diary =
-        diaryService
-            .findByDate(principal.getId(), date)
-            .orElseThrow(ResourceNotFoundException::new);
-    model.addAttribute("diary", toView(diary));
+    Long userId = principal.getId();
+    Optional<Diary> diary = diaryService.findByDate(userId, date);
+    if (diary.isEmpty() && postService.findPostsOn(userId, date).isEmpty()) {
+      throw new ResourceNotFoundException();
+    }
+    model.addAttribute("diary", diary.map(this::toView).orElse(null));
+    model.addAttribute("date", date);
     return "diary/show";
+  }
+
+  @GetMapping("/diaries")
+  public String list(
+      @RequestParam(name = "q", required = false) String q,
+      @RequestParam(name = "page", defaultValue = "0") int page,
+      @AuthenticationPrincipal TsumoryUserDetails principal,
+      Model model) {
+    Page<Diary> diaries = diaryService.findPage(principal.getId(), q, page);
+    model.addAttribute("diaries", diaries.map(this::toSummaryView).getContent());
+    model.addAttribute("q", q);
+    model.addAttribute("page", page);
+    model.addAttribute("hasPrevious", diaries.hasPrevious());
+    model.addAttribute("hasNext", diaries.hasNext());
+    model.addAttribute("today", LocalDate.now(clock));
+    return "diaries/index";
   }
 
   @PostMapping("/diaries/generate")
   public String generate(
+      @RequestParam(name = "date", required = false) LocalDate date,
       @AuthenticationPrincipal TsumoryUserDetails principal,
       RedirectAttributes redirectAttributes) {
     Long userId = principal.getId();
     LocalDate today = LocalDate.now(clock);
-    List<Post> posts = postService.findTodayPosts(userId);
-    if (posts.isEmpty()) {
-      redirectAttributes.addFlashAttribute("errorMessage", "今日はまだつぶやきがありません");
-      return "redirect:/posts";
+    LocalDate targetDate = date != null ? date : today;
+    boolean isToday = targetDate.equals(today);
+
+    if (targetDate.isAfter(today)) {
+      redirectAttributes.addFlashAttribute("errorMessage", "未来の日付の日記は作成できません");
+      return "redirect:/diaries";
     }
-    boolean diaryExisted = diaryService.findByDate(userId, today).isPresent();
+
+    List<Post> posts = postService.findPostsOn(userId, targetDate);
+    if (posts.isEmpty()) {
+      redirectAttributes.addFlashAttribute(
+          "errorMessage", isToday ? "今日はまだつぶやきがありません" : "その日のつぶやきがありません");
+      return isToday ? "redirect:/posts" : "redirect:/diaries";
+    }
+
+    boolean diaryExisted = diaryService.findByDate(userId, targetDate).isPresent();
     try {
       String body = diaryWriter.write(posts);
-      diaryService.upsertToday(userId, body);
+      diaryService.upsert(userId, targetDate, body);
     } catch (Exception e) {
       log.warn("Diary generation failed for userId={}", userId, e);
       redirectAttributes.addFlashAttribute("errorMessage", "日記の生成に失敗しました。時間をおいて試してください");
-      return diaryExisted ? "redirect:/diary/" + today : "redirect:/posts";
+      if (diaryExisted) {
+        return "redirect:/diary/" + targetDate;
+      }
+      return isToday ? "redirect:/posts" : "redirect:/diaries";
     }
-    return "redirect:/diary/" + today;
+    return "redirect:/diary/" + targetDate;
   }
 
   private DiaryView toView(Diary diary) {
     String generatedAt =
         GENERATED_AT_FORMAT.withZone(clock.getZone()).format(diary.getGeneratedAt());
     return new DiaryView(diary.getBody(), generatedAt);
+  }
+
+  private DiarySummaryView toSummaryView(Diary diary) {
+    String body = diary.getBody();
+    String preview =
+        body.length() > PREVIEW_LENGTH ? body.substring(0, PREVIEW_LENGTH) + "…" : body;
+    return new DiarySummaryView(diary.getDiaryOn(), preview);
   }
 }

@@ -11,5 +11,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   List<Post> findByUser_IdAndPostedAtGreaterThanEqualAndPostedAtLessThanOrderByPostedAtAsc(
       Long userId, Instant startInclusive, Instant endExclusive);
 
+  long countByUser_IdAndPostedAtGreaterThanEqualAndPostedAtLessThan(
+      Long userId, Instant startInclusive, Instant endExclusive);
+
   Optional<Post> findByIdAndUserId(Long id, Long userId);
 }

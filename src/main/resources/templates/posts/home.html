@@ -10,6 +10,11 @@
             th:name="${_csrf.parameterName}"
             th:value="${_csrf.token}"
           />
+          <div
+            th:if="${#fields.hasGlobalErrors()}"
+            class="text-danger small mb-1"
+            th:errors="*{global}"
+          ></div>
           <div class="input-group">
             <textarea
               th:field="*{body}"
@@ -60,6 +65,27 @@
               <div>
                 <div class="text-muted small" th:text="${post.postedAt()}">00:00</div>
                 <div th:text="${post.body()}">つぶやき本文</div>
+                <form th:action="@{/posts/{id}/category(id=${post.id()})}" method="post" class="mt-1">
+                  <input
+                    type="hidden"
+                    th:if="${_csrf != null}"
+                    th:name="${_csrf.parameterName}"
+                    th:value="${_csrf.token}"
+                  />
+                  <select
+                    name="category"
+                    class="form-select form-select-sm w-auto d-inline-block"
+                    onchange="this.form.submit()"
+                  >
+                    <option value="" disabled th:selected="${post.category() == null}">未分類</option>
+                    <option
+                      th:each="c : ${T(com.example.tsumory.domain.PostCategory).values()}"
+                      th:value="${c}"
+                      th:text="${c.label}"
+                      th:selected="${c == post.category()}"
+                    ></option>
+                  </select>
+                </form>
               </div>
               <div class="d-flex gap-2">
                 <a th:href="@{/posts(edit=${post.id()})}" class="btn btn-outline-secondary btn-sm"

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+  <body>
+    <th:block th:replace="~{fragments/layout :: layout(title='過去の日記', content=~{::section})}">
+      <section>
+        <form th:action="@{/diaries}" method="get" class="input-group mb-4">
+          <input
+            type="text"
+            name="q"
+            th:value="${q}"
+            class="form-control"
+            placeholder="キーワードで検索"
+          />
+          <button type="submit" class="btn btn-primary">検索</button>
+        </form>
+
+        <form
+          th:action="@{/diaries/generate}"
+          method="post"
+          class="d-flex gap-2 align-items-center mb-4"
+        >
+          <input
+            type="hidden"
+            th:if="${_csrf != null}"
+            th:name="${_csrf.parameterName}"
+            th:value="${_csrf.token}"
+          />
+          <input
+            type="date"
+            name="date"
+            th:max="${today}"
+            required
+            class="form-control"
+            style="max-width: 200px"
+          />
+          <button type="submit" class="btn btn-success">日付を指定して日記を作る</button>
+        </form>
+
+        <div th:if="${diaries.isEmpty()}" class="text-muted mb-4">
+          <span th:if="${q != null and !q.isEmpty()}">該当する日記が見つかりませんでした</span>
+          <span th:unless="${q != null and !q.isEmpty()}">まだ日記がありません</span>
+        </div>
+        <ul class="list-group mb-4" th:unless="${diaries.isEmpty()}">
+          <li class="list-group-item" th:each="diary : ${diaries}">
+            <div class="text-muted small" th:text="${diary.date()}">2024-01-01</div>
+            <div th:text="${diary.preview()}">日記のプレビュー</div>
+            <a
+              th:href="@{/diary/{date}(date=${diary.date()})}"
+              class="btn btn-outline-primary btn-sm mt-1"
+              >読む</a
+            >
+          </li>
+        </ul>
+
+        <div class="d-flex gap-2 mb-4">
+          <a
+            th:if="${hasPrevious}"
+            th:href="@{/diaries(q=${q}, page=${page - 1})}"
+            class="btn btn-outline-secondary btn-sm"
+            >前へ</a
+          >
+          <a
+            th:if="${hasNext}"
+            th:href="@{/diaries(q=${q}, page=${page + 1})}"
+            class="btn btn-outline-secondary btn-sm"
+            >次へ</a
+          >
+        </div>
+
+        <a th:href="@{/posts}" class="btn btn-outline-secondary">ホームへ戻る</a>
+      </section>
+    </th:block>
+  </body>
+</html>

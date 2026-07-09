@@ -1,8 +1,10 @@
 package com.example.tsumory.controller;
 
 import com.example.tsumory.domain.Post;
+import com.example.tsumory.domain.PostCategory;
 import com.example.tsumory.form.PostForm;
 import com.example.tsumory.security.TsumoryUserDetails;
+import com.example.tsumory.service.DailyPostLimitExceededException;
 import com.example.tsumory.service.DiaryService;
 import com.example.tsumory.service.PostService;
 import jakarta.validation.Valid;
@@ -42,7 +44,7 @@ public class PostController {
       @AuthenticationPrincipal TsumoryUserDetails principal,
       Model model) {
     populateHomeModel(principal.getId(), edit, model);
-    return "posts/index";
+    return "posts/home";
   }
 
   @PostMapping("/posts")
@@ -53,9 +55,15 @@ public class PostController {
       Model model) {
     if (bindingResult.hasErrors()) {
       populateHomeModel(principal.getId(), null, model);
-      return "posts/index";
+      return "posts/home";
     }
-    postService.create(principal.getId(), postForm.body());
+    try {
+      postService.create(principal.getId(), postForm.body());
+    } catch (DailyPostLimitExceededException e) {
+      bindingResult.reject("dailyPostLimit", e.getMessage());
+      populateHomeModel(principal.getId(), null, model);
+      return "posts/home";
+    }
     return "redirect:/posts";
   }
 
@@ -69,7 +77,7 @@ public class PostController {
     if (bindingResult.hasErrors()) {
       postService.findOwnedPost(principal.getId(), id);
       populateHomeModel(principal.getId(), id, model);
-      return "posts/index";
+      return "posts/home";
     }
     postService.edit(principal.getId(), id, editForm.body());
     return "redirect:/posts";
@@ -82,8 +90,19 @@ public class PostController {
     return "redirect:/posts";
   }
 
+  @PostMapping("/posts/{id}/category")
+  public String updateCategory(
+      @PathVariable Long id,
+      @RequestParam PostCategory category,
+      @AuthenticationPrincipal TsumoryUserDetails principal) {
+    postService.setCategory(principal.getId(), id, category);
+    return "redirect:/posts";
+  }
+
   private void populateHomeModel(Long userId, Long editingPostId, Model model) {
-    List<PostView> posts = postService.findTodayPosts(userId).stream().map(this::toView).toList();
+    LocalDate today = LocalDate.now(clock);
+    List<PostView> posts =
+        postService.findPostsOn(userId, today).stream().map(this::toView).toList();
     model.addAttribute("posts", posts);
     if (!model.containsAttribute("postForm")) {
       model.addAttribute("postForm", new PostForm(""));
@@ -95,13 +114,12 @@ public class PostController {
         model.addAttribute("editForm", new PostForm(editingPost.getBody()));
       }
     }
-    LocalDate today = LocalDate.now(clock);
     model.addAttribute("today", today);
     model.addAttribute("todayDiaryExists", diaryService.findByDate(userId, today).isPresent());
   }
 
   private PostView toView(Post post) {
     String postedAt = POSTED_AT_FORMAT.withZone(clock.getZone()).format(post.getPostedAt());
-    return new PostView(post.getId(), post.getBody(), postedAt);
+    return new PostView(post.getId(), post.getBody(), postedAt, post.getCategory());
   }
 }

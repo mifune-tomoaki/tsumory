@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="ja" xmlns:th="http://www.thymeleaf.org">
   <body>
-    <th:block th:replace="~{fragments/layout :: layout(title='今日の日記', content=~{::section})}">
+    <th:block th:replace="~{fragments/layout :: layout(title='日記', content=~{::section})}">
       <section>
-        <p class="text-muted small">
-          生成日時: <span th:text="${diary.generatedAt()}">2024-01-01 00:00</span>
-        </p>
-        <p class="mb-4" style="white-space: pre-wrap" th:text="${diary.body()}">日記本文</p>
+        <div th:if="${diary != null}">
+          <p class="text-muted small">
+            生成日時: <span th:text="${diary.generatedAt()}">2024-01-01 00:00</span>
+          </p>
+          <p class="mb-4" style="white-space: pre-wrap" th:text="${diary.body()}">日記本文</p>
+        </div>
+        <p th:if="${diary == null}" class="text-muted mb-4">この日はまだ日記がありません</p>
 
         <form th:action="@{/diaries/generate}" method="post" id="diary-generate-form" class="d-inline">
           <input
@@ -15,18 +18,28 @@
             th:name="${_csrf.parameterName}"
             th:value="${_csrf.token}"
           />
-          <button type="submit" class="btn btn-success" id="diary-generate-button">作り直す</button>
+          <input type="hidden" name="date" th:value="${date}" />
+          <button
+            type="submit"
+            class="btn btn-success"
+            id="diary-generate-button"
+            th:text="${diary != null ? '作り直す' : 'この日の日記を作る'}"
+            th:attr="data-loading-text=${diary != null ? '作り直しています…' : '作成しています…'}"
+          >
+            作り直す
+          </button>
         </form>
         <a th:href="@{/posts}" class="btn btn-outline-secondary">ホームへ戻る</a>
+        <a th:href="@{/diaries}" class="btn btn-outline-secondary">一覧へ戻る</a>
 
         <script>
           const diaryGenerateForm = document.getElementById('diary-generate-form');
           if (diaryGenerateForm) {
             diaryGenerateForm.addEventListener('submit', function () {
               const button = document.getElementById('diary-generate-button');
+              const loadingText = button.getAttribute('data-loading-text');
               button.disabled = true;
-              button.innerHTML =
-                '<span class="spinner-border spinner-border-sm me-1"></span>作り直しています…';
+              button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + loadingText;
             });
           }
         </script>
