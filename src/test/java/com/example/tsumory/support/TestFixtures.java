@@ -1,5 +1,6 @@
 package com.example.tsumory.support;
 
+import com.example.tsumory.domain.Post;
 import com.example.tsumory.domain.User;
 import java.time.Clock;
 import java.time.Instant;
@@ -43,5 +44,10 @@ public final class TestFixtures {
 
   public static User user() {
     return new User("hanako.tanaka@example.com", "$2a$10$dummyBcryptHashForTesting", NOW);
+  }
+
+  /** {@link #user()}が投稿した体で本文だけ差し替えたPostを組み立てる。 */
+  public static Post post(String body) {
+    return new Post(user(), body, Instant.now());
   }
 }

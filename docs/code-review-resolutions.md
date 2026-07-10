@@ -85,3 +85,24 @@
 ### 残課題
 
 同じ監査で、`Post`/`Diary`のコンストラクタ・ミューテータ自体はnull/空文字を自前でガードしておらず、JPAのflush時Bean Validation任せになっている点、および`User.email`/`passwordHash`にBean Validationが一切無い点も見つかったが、現状バイパス経路が実在しないため、今回は対応を見送った。経緯と再開条件は[deferred-decisions.md](./deferred-decisions.md)に記録している。
+
+## [refactor-tests.md](./refactor-tests.md) 指摘1: `Post`ファクトリヘルパーの重複
+
+### 何が問題だったか
+
+`private Post post(String body) { return new Post(TestFixtures.user(), body, Instant.now()); }`という同一内容のprivateヘルパーが、`domain`パッケージの`PostTest`と`service`パッケージの`AnthropicPostCategorizerTest`の2箇所に一字一句同じ内容で存在していた。`new Post(TestFixtures.user(), body, ...)`という組み立て自体は他のテストクラス(`PostServiceTest`など)にも繰り返し登場しており、`Post`のテスト用ファクトリが各テストクラスにローカルで再発明されている状態だった。
+
+### どう直したか
+
+`TestFixtures`(`support`パッケージ)に`public static Post post(String body)`を追加し、`PostTest`/`AnthropicPostCategorizerTest`のローカルヘルパーを削除して、両クラスとも`TestFixtures.post(...)`を使う形に統一した。
+
+内部実装は元のヘルパーと同じく`Instant.now()`を使っている(このテストスイートの他の箇所は`TestFixtures.fixedClock()`で日時を固定しているが、それに揃えるかどうかは[refactor-tests.md](./refactor-tests.md)指摘3で別途扱う話であり、今回は重複排除のみに範囲を絞った)。
+
+### どう検証したか
+
+- `TestFixturesTest`(`support`パッケージ)を新設し、`TestFixtures.post(body)`が指定した本文を持ち、`TestFixtures.user()`と同じメールアドレスのユーザーに紐づく`Post`を返すことを確認。
+- `PostTest`/`AnthropicPostCategorizerTest`のリファクタ後も、既存のテストがすべてパスすることを確認(`./gradlew test`)。
+
+### 影響範囲・残課題
+
+- `PostServiceTest`や`AnthropicDiaryWriterTest`など、他にも`new Post(TestFixtures.user(), body, ...)`という組み立てをローカルで行っている箇所があるが、今回は[refactor-tests.md](./refactor-tests.md)指摘1が指している`PostTest`/`AnthropicPostCategorizerTest`の重複解消にとどめた。他クラスへの展開、および対になる`TestFixtures.diary(String body)`の追加([refactor-tests.md](./refactor-tests.md)指摘2)は別途対応する。
