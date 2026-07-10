@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -35,6 +36,7 @@ public class Diary {
   @Column(name = "diary_on", nullable = false, updatable = false)
   private LocalDate diaryOn;
 
+  @NotBlank
   @Column(nullable = false, columnDefinition = "text")
   private String body;
 

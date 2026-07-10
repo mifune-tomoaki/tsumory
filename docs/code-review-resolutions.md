@@ -67,3 +67,21 @@
 これにより、「AIに渡す前に無害化する」という制約が`Post`という単一の場所に集約され、`Post`を組み立てて`PostCategorizer`/`DiaryWriter`に渡しさえすれば、フォーム層はもちろんservice層の各AI連携クラスの実装を経由しなくても自動的に適用される状態になった。
 
 **検証**: `PostTest`(`domain`パッケージ)を追加し、(a)通常の本文は変化しないこと、(b)偽装タグを含む本文でも`bodyForPrompt()`の戻り値には偽装タグが残らないこと、(c)`bodyForPrompt()`を呼んでも永続化対象の`getBody()`自体は変更されないことを確認。`PromptSanitizerTest`も`domain`パッケージへ移設。`PostServiceTest`/`AnthropicPostCategorizerTest`はインタフェース変更(`categorize(Post)`)に合わせて更新し、全テストがパスすることを確認済み。
+
+## Diary.bodyにNotBlankが無かった件(フォローアップ監査での発見)
+
+### 何が問題だったか
+
+`Post.body`には`@NotBlank @Size(max = 100)`が付いているのに、`Diary.body`(AIが生成する日記本文、`columnDefinition = "text"`)には何のBean Validationも付いていなかった。`AnthropicDiaryWriter.write()`はAI応答にテキストブロックが1つも含まれない場合`Collectors.joining()`により空文字列を返しうる実装になっており、その場合`DiaryService.upsert()`は何の検証にも引っかからず、空の日記をそのまま保存してしまう。AI生成が実質的に失敗している(または空応答だった)ことに誰も気づけないまま、ユーザーには空の日記ページが表示される状態になり得た。
+
+### どう直したか
+
+`Diary.body`に`@NotBlank`を追加。これにより、空の日記を保存しようとするとHibernateのBean Validation統合がflush時に`ConstraintViolationException`を投げる。この例外は`DiaryService.upsert()`(`@Transactional`)経由で`DiaryController.generate()`の`catch (Exception e)`にそのまま乗るため、既存のエラーハンドリング経路(「日記の生成に失敗しました。時間をおいて試してください」という表示)にそのまま接続され、新しい分岐を追加する必要がなかった。
+
+### どう検証したか
+
+`DiaryTest`(`domain`パッケージ)を追加し、Bean Validationの`Validator`を直接使って(1)空文字列の本文が`ConstraintViolation`を発生させること、(2)通常の本文では違反が発生しないことを確認。DBやSpringコンテキストを起動せず、Bean Validationアノテーションだけを対象にした軽量なテストにしている。
+
+### 残課題
+
+同じ監査で、`Post`/`Diary`のコンストラクタ・ミューテータ自体はnull/空文字を自前でガードしておらず、JPAのflush時Bean Validation任せになっている点、および`User.email`/`passwordHash`にBean Validationが一切無い点も見つかったが、現状バイパス経路が実在しないため、今回は対応を見送った(要望が出た時点で再検討する)。
