@@ -52,3 +52,18 @@
 - `Post`/`Diary`のドメインモデルや永続化されるデータは変更していない。影響はAnthropic APIへ送信するプロンプト文字列の組み立てのみ。
 - 今回の対策はタグ偽装への対策であり、プロンプトインジェクションを完全に無効化するものではない(LLMの性質上、完全な防御は原理的に難しい)。分類側はツール呼び出し+enum制約、日記側はテンプレートの自動エスケープという既存の多層防御と合わせて、実害を低く抑える設計として位置づける。
 - 同様にユーザー入力をプロンプトへ埋め込む処理を新設する場合は、`PromptSanitizer.sanitize(...)`を通すことを徹底する。
+
+### 追記(2026-07-10): 無害化の責務をdomain層に移動
+
+初回対応時点では`PromptSanitizer`が`service`パッケージにあり、`AnthropicPostCategorizer`/`AnthropicDiaryWriter`が自分で呼び出す形だった。この場合、無害化されるかどうかは「AI連携クラスが呼び出しの都度、無害化を忘れずに行うか」に依存しており、`PostForm`によるBean Validationのような入力層をバイパスして`Post`を直接組み立てる経路(将来のバッチ処理・API化など)があった場合、AI呼び出し側の実装次第では無害化を素通りしてしまう余地が残っていた。
+
+これを踏まえ、無害化の責務を`service`層から`domain`層(`Post`)へ移した。
+
+- `PromptSanitizer`を`com.example.tsumory.service`から`com.example.tsumory.domain`へ移動(package-privateのまま)。
+- `Post`に`public String bodyForPrompt()`を追加。AIへ渡す本文は必ずこのメソッド経由で取得し、永続化される`body`フィールド自体は変更しない。
+- `PostCategorizer`インタフェースを`categorize(String body)`から`categorize(Post post)`に変更(`DiaryWriter.write(List<Post>)`と同様、生の文字列ではなくドメインオブジェクトを受け取る形に統一)。`AnthropicPostCategorizer`/`PostService.triggerCategorization`もそれに合わせて更新。
+- `AnthropicDiaryWriter.formatPostLine`も`PromptSanitizer.sanitize(post.getBody())`の直接呼び出しをやめ、`post.bodyForPrompt()`を使うよう変更。
+
+これにより、「AIに渡す前に無害化する」という制約が`Post`という単一の場所に集約され、`Post`を組み立てて`PostCategorizer`/`DiaryWriter`に渡しさえすれば、フォーム層はもちろんservice層の各AI連携クラスの実装を経由しなくても自動的に適用される状態になった。
+
+**検証**: `PostTest`(`domain`パッケージ)を追加し、(a)通常の本文は変化しないこと、(b)偽装タグを含む本文でも`bodyForPrompt()`の戻り値には偽装タグが残らないこと、(c)`bodyForPrompt()`を呼んでも永続化対象の`getBody()`自体は変更されないことを確認。`PromptSanitizerTest`も`domain`パッケージへ移設。`PostServiceTest`/`AnthropicPostCategorizerTest`はインタフェース変更(`categorize(Post)`)に合わせて更新し、全テストがパスすることを確認済み。

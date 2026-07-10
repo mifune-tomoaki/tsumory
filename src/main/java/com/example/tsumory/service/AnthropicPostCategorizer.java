@@ -8,6 +8,7 @@ import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.Tool;
 import com.anthropic.models.messages.ToolChoiceTool;
 import com.anthropic.models.messages.ToolUseBlock;
+import com.example.tsumory.domain.Post;
 import com.example.tsumory.domain.PostCategory;
 import java.util.Arrays;
 import java.util.List;
@@ -47,13 +48,13 @@ public class AnthropicPostCategorizer implements PostCategorizer {
   }
 
   @Override
-  public PostCategory categorize(String body) {
+  public PostCategory categorize(Post post) {
     MessageCreateParams params =
         MessageCreateParams.builder()
             .model(model)
             .maxTokens(maxTokens)
             .system(SYSTEM_PROMPT)
-            .addUserMessage(buildUserMessage(body))
+            .addUserMessage(buildUserMessage(post))
             .addTool(categorizeTool)
             .toolChoice(ToolChoiceTool.builder().name(TOOL_NAME).build())
             .build();
@@ -98,15 +99,18 @@ public class AnthropicPostCategorizer implements PostCategorizer {
     return category;
   }
 
-  /** つぶやき本文を<tsubuyaki>タグで区切り、区切り文字自体を偽装した入力を無害化する。 */
-  String buildUserMessage(String body) {
+  /**
+   * つぶやき本文を<tsubuyaki>タグで区切ってプロンプトに組み込む。 {@link
+   * Post#bodyForPrompt()}経由で区切り文字自体を偽装した入力を無害化する(本文自体はどこから来ても無害化される)。
+   */
+  String buildUserMessage(Post post) {
     return """
         以下の<tsubuyaki>タグ内のテキストに最も当てはまるカテゴリを1つ選んでください。
 
         <tsubuyaki>
         %s
         </tsubuyaki>"""
-        .formatted(PromptSanitizer.sanitize(body));
+        .formatted(post.bodyForPrompt());
   }
 
   private static Tool buildCategorizeTool() {

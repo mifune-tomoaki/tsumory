@@ -1,4 +1,4 @@
-package com.example.tsumory.service;
+package com.example.tsumory.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

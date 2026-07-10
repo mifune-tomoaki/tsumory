@@ -107,7 +107,7 @@ public class AnthropicDiaryWriter implements DiaryWriter {
 
   private String formatPostLine(Post post) {
     String postedAt = POSTED_AT_FORMAT.withZone(clock.getZone()).format(post.getPostedAt());
-    String body = PromptSanitizer.sanitize(post.getBody());
+    String body = post.bodyForPrompt();
     PostCategory category = post.getCategory();
     return category == null
         ? "%s %s".formatted(postedAt, body)

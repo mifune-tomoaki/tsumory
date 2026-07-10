@@ -58,7 +58,7 @@ public class PostService {
     Post saved = postRepository.save(new Post(user, body, clock.instant()));
     // 本文には個人的な内容が含まれるためログには文字数のみ出力する
     log.info("Created post id={} for userId={} (length={})", saved.getId(), userId, body.length());
-    triggerCategorization(saved.getId(), body);
+    triggerCategorization(saved);
     return saved;
   }
 
@@ -67,7 +67,7 @@ public class PostService {
     Post post = findOwnedPost(userId, postId);
     post.edit(body);
     log.info("Edited post id={} for userId={} (length={})", postId, userId, body.length());
-    triggerCategorization(post.getId(), body);
+    triggerCategorization(post);
   }
 
   /** AIによる分類結果を反映する。分類完了までに投稿が削除されている場合は何もしない。 */
@@ -89,11 +89,12 @@ public class PostService {
     categorizationExecutor.shutdown();
   }
 
-  private void triggerCategorization(Long postId, String body) {
+  private void triggerCategorization(Post post) {
+    Long postId = post.getId();
     categorizationExecutor.execute(
         () -> {
           try {
-            applyCategory(postId, postCategorizer.categorize(body));
+            applyCategory(postId, postCategorizer.categorize(post));
           } catch (RuntimeException e) {
             log.warn("Post categorization failed postId={} error={}", postId, e.toString());
           }

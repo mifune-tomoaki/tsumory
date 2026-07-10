@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.never;
@@ -85,7 +85,8 @@ class PostServiceTest {
     assertThat(result.getPostedAt()).isEqualTo(clock.instant());
     verify(postRepository).save(any(Post.class));
     // 分類は非同期でトリガーされる
-    verify(postCategorizer, timeout(2000)).categorize(POST_BODY_MORNING);
+    verify(postCategorizer, timeout(2000))
+        .categorize(argThat(post -> post.getBody().equals(POST_BODY_MORNING)));
   }
 
   @Test
@@ -108,12 +109,13 @@ class PostServiceTest {
         .thenReturn(0L);
     when(userRepository.getReferenceById(USER_ID)).thenReturn(TestFixtures.user());
     when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
-    when(postCategorizer.categorize(anyString())).thenThrow(new RuntimeException("AI error"));
+    when(postCategorizer.categorize(any(Post.class))).thenThrow(new RuntimeException("AI error"));
 
     Post result = postService.create(USER_ID, POST_BODY_LUNCH);
 
     assertThat(result).isNotNull();
-    verify(postCategorizer, timeout(2000)).categorize(POST_BODY_LUNCH);
+    verify(postCategorizer, timeout(2000))
+        .categorize(argThat(post -> post.getBody().equals(POST_BODY_LUNCH)));
     // 分類失敗時はapplyCategory(=findById)まで到達しない
     verify(postRepository, after(500).never()).findById(any());
   }

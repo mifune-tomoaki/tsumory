@@ -60,4 +60,13 @@ public class Post {
   public void assignCategory(PostCategory category) {
     this.category = category;
   }
+
+  /**
+   * AIへのプロンプトに埋め込む際に安全な形へ無害化した本文を返す。 区切りタグ({@code <tsubuyaki>}や{@code
+   * <posts>}など)を偽装したプロンプトインジェクションを防ぐため、 AI連携コードは{@link #getBody()}ではなく必ずこちらを使うこと。永続化される本文({@link
+   * #getBody()})自体は変更しない。
+   */
+  public String bodyForPrompt() {
+    return PromptSanitizer.sanitize(body);
+  }
 }
