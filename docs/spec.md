@@ -25,3 +25,7 @@ service層コードのレビュー結果。可読性・保守性/エラーハン
 ## [code-review-non-service.md](./code-review-non-service.md)
 
 service層以外(config/controller/domain/form/repository/security、およびリソース類)のコードレビュー結果。code-review-service.mdと同じ観点でまとめたもの。
+
+## [code-review-resolutions.md](./code-review-resolutions.md)
+
+code-review-service.md/code-review-non-service.mdで挙げた指摘のうち対応済みのものについて、何を・なぜ・どう直したか・どう検証したかを記録した解消メモ。

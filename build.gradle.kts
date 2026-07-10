@@ -45,6 +45,12 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+// ローカル開発時はdevプロファイルを有効化し、application-dev.yamlのSQLログ設定を効かせる。
+// 本番相当環境(gradle経由ではなくjarを直接実行する場合など)には影響しない。
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    environment("SPRING_PROFILES_ACTIVE", "dev")
+}
+
 spotless {
     java {
         googleJavaFormat()

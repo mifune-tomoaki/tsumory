@@ -8,6 +8,8 @@
 
 ### 1. `application.yaml`のHibernateバインド値トレースログが、service層の機微情報マスキングを無効化している
 
+> **✅ 対応済み**: [code-review-resolutions.md](./code-review-resolutions.md#code-review-non-servicemd-指摘1-hibernateバインド値トレースログが全環境で有効だった)を参照。
+
 **該当箇所**: `application.yaml:16-19`
 
 ```yaml
@@ -125,7 +127,7 @@ auth.requestMatchers("/login", "/webjars/**").permitAll().anyRequest().authentic
 
 | # | 分類 | 深刻度 | 内容 |
 |---|---|---|---|
-| 1 | セキュリティ | 高 | `application.yaml`のHibernateバインド値トレースログが全環境で有効になっており、service層のログマスキング方針を無効化している |
+| 1 | セキュリティ | 高 | ✅対応済み。`application.yaml`のHibernateバインド値トレースログが全環境で有効になっており、service層のログマスキング方針を無効化している |
 | 2 | 可読性・保守性 | 中 | 日記生成のオーケストレーションがcontroller層にあり、service層の責務からはみ出している |
 | 3 | 可読性・保守性 | 低 | CSRF隠しフィールドの手動出力とThymeleaf自動注入の重複疑い |
 | 4 | 可読性・保守性 | 低 | `PostCategory`にBootstrap依存のCSSクラス名が漏れている |

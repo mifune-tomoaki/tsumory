@@ -1,0 +1,13 @@
+# ローカル開発時のみ有効化するログ設定。
+# SQL本文・バインドパラメータ実値(投稿/日記の本文、メールアドレスなど)をログに出力するため、
+# devプロファイル以外(本番相当環境を含む)では絶対に有効化しないこと。
+# ./gradlew bootRunではbuild.gradle.ktsの設定によりこのプロファイルが自動的に有効になる。
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
