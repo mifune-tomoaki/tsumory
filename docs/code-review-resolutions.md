@@ -84,4 +84,4 @@
 
 ### 残課題
 
-同じ監査で、`Post`/`Diary`のコンストラクタ・ミューテータ自体はnull/空文字を自前でガードしておらず、JPAのflush時Bean Validation任せになっている点、および`User.email`/`passwordHash`にBean Validationが一切無い点も見つかったが、現状バイパス経路が実在しないため、今回は対応を見送った(要望が出た時点で再検討する)。
+同じ監査で、`Post`/`Diary`のコンストラクタ・ミューテータ自体はnull/空文字を自前でガードしておらず、JPAのflush時Bean Validation任せになっている点、および`User.email`/`passwordHash`にBean Validationが一切無い点も見つかったが、現状バイパス経路が実在しないため、今回は対応を見送った。経緯と再開条件は[deferred-decisions.md](./deferred-decisions.md)に記録している。
