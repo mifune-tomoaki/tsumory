@@ -69,6 +69,27 @@ class DiaryServiceTest {
   }
 
   @Test
+  void isFutureDate_returnsTrueForDateAfterToday() {
+    LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
+
+    assertThat(diaryService.isFutureDate(tomorrow)).isTrue();
+  }
+
+  @Test
+  void isFutureDate_returnsFalseForToday() {
+    LocalDate today = LocalDate.now(clock);
+
+    assertThat(diaryService.isFutureDate(today)).isFalse();
+  }
+
+  @Test
+  void isFutureDate_returnsFalseForPastDate() {
+    LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+
+    assertThat(diaryService.isFutureDate(yesterday)).isFalse();
+  }
+
+  @Test
   void findPage_usesPlainListingWhenQueryIsBlank() {
     Page<Diary> page = new PageImpl<>(List.of());
     when(diaryRepository.findByUserIdOrderByDiaryOnDesc(

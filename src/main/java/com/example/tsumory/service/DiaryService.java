@@ -32,6 +32,11 @@ public class DiaryService {
     return diary;
   }
 
+  /** 指定した日付が「今日」より未来かどうかを判定する。日記の閲覧・生成のどちらも未来日付は認めない。 */
+  public boolean isFutureDate(LocalDate date) {
+    return date.isAfter(LocalDate.now(clock));
+  }
+
   /** 過去の日記一覧・検索。{@code q}が空/nullなら全件、指定があれば本文の部分一致で絞り込む。 */
   public Page<Diary> findPage(Long userId, String q, int page) {
     PageRequest pageRequest = PageRequest.of(page, PAGE_SIZE);

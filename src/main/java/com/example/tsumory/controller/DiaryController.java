@@ -43,7 +43,7 @@ public class DiaryController {
       @PathVariable LocalDate date,
       @AuthenticationPrincipal TsumoryUserDetails principal,
       Model model) {
-    if (date.isAfter(LocalDate.now(clock))) {
+    if (diaryService.isFutureDate(date)) {
       throw new ResourceNotFoundException();
     }
     Long userId = principal.getId();
@@ -82,7 +82,7 @@ public class DiaryController {
     LocalDate targetDate = date != null ? date : today;
     boolean isToday = targetDate.equals(today);
 
-    if (targetDate.isAfter(today)) {
+    if (diaryService.isFutureDate(targetDate)) {
       redirectAttributes.addFlashAttribute("errorMessage", "未来の日付の日記は作成できません");
       return "redirect:/diaries";
     }
