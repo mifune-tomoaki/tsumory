@@ -3,15 +3,40 @@
   <body>
     <th:block th:replace="~{fragments/layout :: layout(title='過去の日記', content=~{::section})}">
       <section>
-        <form th:action="@{/diaries}" method="get" class="input-group mb-4">
-          <input
-            type="text"
-            name="q"
-            th:value="${q}"
-            class="form-control"
-            placeholder="キーワードで検索"
-          />
-          <button type="submit" class="btn btn-primary">検索</button>
+        <form th:action="@{/diaries}" method="get" class="row row-cols-auto g-2 align-items-center mb-4">
+          <div class="col">
+            <input
+              type="text"
+              name="q"
+              th:value="${q}"
+              class="form-control"
+              placeholder="キーワードで検索"
+            />
+          </div>
+          <div class="col">
+            <input
+              type="date"
+              name="from"
+              th:value="${from}"
+              th:max="${today}"
+              class="form-control"
+              aria-label="検索開始日"
+            />
+          </div>
+          <div class="col-auto">〜</div>
+          <div class="col">
+            <input
+              type="date"
+              name="to"
+              th:value="${to}"
+              th:max="${today}"
+              class="form-control"
+              aria-label="検索終了日"
+            />
+          </div>
+          <div class="col">
+            <button type="submit" class="btn btn-primary">検索</button>
+          </div>
         </form>
 
         <form
@@ -37,8 +62,12 @@
         </form>
 
         <div th:if="${diaries.isEmpty()}" class="text-muted mb-4">
-          <span th:if="${q != null and !q.isEmpty()}">該当する日記が見つかりませんでした</span>
-          <span th:unless="${q != null and !q.isEmpty()}">まだ日記がありません</span>
+          <span th:if="${(q != null and !q.isEmpty()) or from != null or to != null}"
+            >該当する日記が見つかりませんでした</span
+          >
+          <span th:unless="${(q != null and !q.isEmpty()) or from != null or to != null}"
+            >まだ日記がありません</span
+          >
         </div>
         <ul class="list-group mb-4" th:unless="${diaries.isEmpty()}">
           <li class="list-group-item" th:each="diary : ${diaries}">
@@ -55,13 +84,13 @@
         <div class="d-flex gap-2 mb-4">
           <a
             th:if="${hasPrevious}"
-            th:href="@{/diaries(q=${q}, page=${page - 1})}"
+            th:href="@{/diaries(q=${q}, from=${from}, to=${to}, page=${page - 1})}"
             class="btn btn-outline-secondary btn-sm"
             >前へ</a
           >
           <a
             th:if="${hasNext}"
-            th:href="@{/diaries(q=${q}, page=${page + 1})}"
+            th:href="@{/diaries(q=${q}, from=${from}, to=${to}, page=${page + 1})}"
             class="btn btn-outline-secondary btn-sm"
             >次へ</a
           >

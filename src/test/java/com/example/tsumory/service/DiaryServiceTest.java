@@ -4,7 +4,6 @@ import static com.example.tsumory.support.TestFixtures.DIARY_BODY_DRAFT;
 import static com.example.tsumory.support.TestFixtures.DIARY_BODY_REGENERATED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,11 +22,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class DiaryServiceTest {
@@ -89,43 +91,28 @@ class DiaryServiceTest {
     assertThat(diaryService.isFutureDate(yesterday)).isFalse();
   }
 
+  // Specificationのラムダ内容そのものはMockitoでは検証できないため、ここではpage/size/sortの委譲のみを
+  // 確認する。q/from/toの絞り込み条件がnullの軸をSQLへ一切送らないことは、実際に起動したアプリに対する
+  // 手動検証(PostgreSQLはnullバインドパラメータの型を推論できずエラーになるため、
+  // JPQLの`:param IS NULL`分岐ではなくCriteria APIで条件自体を組み立てから除外する必要があった)で確認済み。
   @Test
-  void findPage_usesPlainListingWhenQueryIsBlank() {
+  void findPage_delegatesToRepositoryWithPageSizeAndDescendingDiaryOnSort() {
     Page<Diary> page = new PageImpl<>(List.of());
-    when(diaryRepository.findByUserIdOrderByDiaryOnDesc(
-            eq(USER_ID), eq(PageRequest.of(0, PAGE_SIZE))))
+    when(diaryRepository.findAll(ArgumentMatchers.<Specification<Diary>>any(), any(Pageable.class)))
         .thenReturn(page);
 
-    Page<Diary> result = diaryService.findPage(USER_ID, "  ", 0);
+    Page<Diary> result =
+        diaryService.findPage(
+            USER_ID, "花見", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 10), 2);
 
     assertThat(result).isSameAs(page);
-    verify(diaryRepository, never())
-        .findByUserIdAndBodyContainingIgnoreCaseOrderByDiaryOnDesc(any(), any(), any());
-  }
-
-  @Test
-  void findPage_usesPlainListingWhenQueryIsNull() {
-    Page<Diary> page = new PageImpl<>(List.of());
-    when(diaryRepository.findByUserIdOrderByDiaryOnDesc(
-            eq(USER_ID), eq(PageRequest.of(2, PAGE_SIZE))))
-        .thenReturn(page);
-
-    Page<Diary> result = diaryService.findPage(USER_ID, null, 2);
-
-    assertThat(result).isSameAs(page);
-  }
-
-  @Test
-  void findPage_searchesBodyWhenQueryIsGiven() {
-    Page<Diary> page = new PageImpl<>(List.of());
-    when(diaryRepository.findByUserIdAndBodyContainingIgnoreCaseOrderByDiaryOnDesc(
-            eq(USER_ID), eq("花見"), eq(PageRequest.of(0, PAGE_SIZE))))
-        .thenReturn(page);
-
-    Page<Diary> result = diaryService.findPage(USER_ID, "花見", 0);
-
-    assertThat(result).isSameAs(page);
-    verify(diaryRepository, never()).findByUserIdOrderByDiaryOnDesc(any(), any());
+    ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+    verify(diaryRepository)
+        .findAll(ArgumentMatchers.<Specification<Diary>>any(), pageableCaptor.capture());
+    Pageable pageable = pageableCaptor.getValue();
+    assertThat(pageable.getPageNumber()).isEqualTo(2);
+    assertThat(pageable.getPageSize()).isEqualTo(PAGE_SIZE);
+    assertThat(pageable.getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "diaryOn"));
   }
 
   @Test

@@ -3,16 +3,11 @@ package com.example.tsumory.repository;
 import com.example.tsumory.domain.Diary;
 import java.time.LocalDate;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface DiaryRepository extends JpaRepository<Diary, Long> {
+public interface DiaryRepository
+    extends JpaRepository<Diary, Long>, JpaSpecificationExecutor<Diary> {
 
   Optional<Diary> findByUserIdAndDiaryOn(Long userId, LocalDate diaryOn);
-
-  Page<Diary> findByUserIdOrderByDiaryOnDesc(Long userId, Pageable pageable);
-
-  Page<Diary> findByUserIdAndBodyContainingIgnoreCaseOrderByDiaryOnDesc(
-      Long userId, String q, Pageable pageable);
 }

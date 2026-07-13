@@ -59,12 +59,16 @@ public class DiaryController {
   @GetMapping("/diaries")
   public String list(
       @RequestParam(name = "q", required = false) String q,
+      @RequestParam(name = "from", required = false) LocalDate from,
+      @RequestParam(name = "to", required = false) LocalDate to,
       @RequestParam(name = "page", defaultValue = "0") int page,
       @AuthenticationPrincipal TsumoryUserDetails principal,
       Model model) {
-    Page<Diary> diaries = diaryService.findPage(principal.getId(), q, page);
+    Page<Diary> diaries = diaryService.findPage(principal.getId(), q, from, to, page);
     model.addAttribute("diaries", diaries.map(this::toSummaryView).getContent());
     model.addAttribute("q", q);
+    model.addAttribute("from", from);
+    model.addAttribute("to", to);
     model.addAttribute("page", page);
     model.addAttribute("hasPrevious", diaries.hasPrevious());
     model.addAttribute("hasNext", diaries.hasNext());
