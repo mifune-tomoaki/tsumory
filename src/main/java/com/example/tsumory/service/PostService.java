@@ -12,14 +12,15 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PostService {
 
@@ -29,9 +30,27 @@ public class PostService {
   private final UserRepository userRepository;
   private final PostCategorizer postCategorizer;
   private final Clock clock;
+  // triggerCategorization()の非同期タスクからapplyCategory()を呼ぶ際、同一クラス内の自己呼び出し(this.applyCategory(...))に
+  // ならないよう、Springが管理するプロキシ経由の自己参照を@Lazyで注入する。自己呼び出しだと@Transactionalが一切効かず、
+  // 分類結果がデタッチ済みエンティティへの書き込みとして握りつぶされ、AI呼び出しは成功してもDBには反映されない
+  // (docs/code-review-service.md 指摘1)。
+  private final PostService self;
 
   private final ExecutorService categorizationExecutor =
       Executors.newVirtualThreadPerTaskExecutor();
+
+  public PostService(
+      PostRepository postRepository,
+      UserRepository userRepository,
+      PostCategorizer postCategorizer,
+      Clock clock,
+      @Lazy PostService self) {
+    this.postRepository = postRepository;
+    this.userRepository = userRepository;
+    this.postCategorizer = postCategorizer;
+    this.clock = clock;
+    this.self = self;
+  }
 
   /** 指定した日付(その日の00:00〜翌日00:00)のつぶやきを投稿時刻昇順で取得する。 */
   public List<Post> findPostsOn(Long userId, LocalDate date) {
@@ -89,12 +108,32 @@ public class PostService {
     categorizationExecutor.shutdown();
   }
 
+  /**
+   * 投稿の分類を非同期でトリガーする。呼び出し元(create/edit)の外側トランザクションがコミットされる前に
+   * 分類タスクが動き出すと、他コネクションからはまだ投稿行が見えず`applyCategory`の`findById`が空振りしうるため、
+   * トランザクション同期に登録してコミット後に投稿するようにする(テストなど、そもそもトランザクションが 開始されていない呼び出し元では即時投入する)。
+   */
   private void triggerCategorization(Post post) {
     Long postId = post.getId();
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              submitCategorization(postId, post);
+            }
+          });
+    } else {
+      submitCategorization(postId, post);
+    }
+  }
+
+  private void submitCategorization(Long postId, Post post) {
     categorizationExecutor.execute(
         () -> {
           try {
-            applyCategory(postId, postCategorizer.categorize(post));
+            // self(Springプロキシ)経由で呼ぶことで@Transactionalが正しく効き、分類結果が確実に永続化される。
+            self.applyCategory(postId, postCategorizer.categorize(post));
           } catch (RuntimeException e) {
             log.warn("Post categorization failed postId={} error={}", postId, e.toString());
           }

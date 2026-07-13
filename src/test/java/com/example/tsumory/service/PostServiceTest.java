@@ -41,6 +41,7 @@ class PostServiceTest {
   @Mock private PostRepository postRepository;
   @Mock private UserRepository userRepository;
   @Mock private PostCategorizer postCategorizer;
+  @Mock private PostService self;
 
   private Clock clock;
   private PostService postService;
@@ -48,7 +49,7 @@ class PostServiceTest {
   @BeforeEach
   void setUp() {
     clock = TestFixtures.fixedClock();
-    postService = new PostService(postRepository, userRepository, postCategorizer, clock);
+    postService = new PostService(postRepository, userRepository, postCategorizer, clock, self);
   }
 
   private Instant startOfDay(LocalDate date) {
@@ -116,8 +117,25 @@ class PostServiceTest {
     assertThat(result).isNotNull();
     verify(postCategorizer, timeout(2000))
         .categorize(argThat(post -> post.getBody().equals(POST_BODY_LUNCH)));
-    // 分類失敗時はapplyCategory(=findById)まで到達しない
-    verify(postRepository, after(500).never()).findById(any());
+    // 分類失敗時はself.applyCategory(...)まで到達しない
+    verify(self, after(500).never()).applyCategory(any(), any());
+  }
+
+  // applyCategory()はself(Springが管理するプロキシ経由の自己参照)を呼ぶ必要がある。this.applyCategory(...)という
+  // 同一クラス内の自己呼び出しに戻すと@Transactionalが一切効かなくなり、AI呼び出しは成功しても分類結果が
+  // デタッチ済みエンティティへの書き込みとして握りつぶされ、DBには反映されない(docs/code-review-service.md 指摘1)。
+  @Test
+  void create_appliesSuccessfulCategorizationThroughSelfProxy() {
+    when(postRepository.countByUser_IdAndPostedAtGreaterThanEqualAndPostedAtLessThan(
+            eq(USER_ID), any(), any()))
+        .thenReturn(0L);
+    when(userRepository.getReferenceById(USER_ID)).thenReturn(TestFixtures.user());
+    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postCategorizer.categorize(any(Post.class))).thenReturn(PostCategory.WORK);
+
+    Post result = postService.create(USER_ID, POST_BODY_MORNING);
+
+    verify(self, timeout(2000)).applyCategory(result.getId(), PostCategory.WORK);
   }
 
   @Test
