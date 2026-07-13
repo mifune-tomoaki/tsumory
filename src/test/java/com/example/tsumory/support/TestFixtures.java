@@ -1,16 +1,25 @@
 package com.example.tsumory.support;
 
+import com.example.tsumory.domain.Diary;
 import com.example.tsumory.domain.Post;
 import com.example.tsumory.domain.User;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Set;
 
-/** service層のユニットテストで使い回す固定クロックとサンプルデータの生成ヘルパー。 */
+/** テスト全体(domain/service層)で使い回す固定クロックとサンプルデータの生成ヘルパー。 */
 public final class TestFixtures {
 
   public static final ZoneOffset ZONE = ZoneOffset.UTC;
   public static final Instant NOW = Instant.parse("2026-07-10T03:00:00Z");
+
+  private static final Validator VALIDATOR =
+      Validation.buildDefaultValidatorFactory().getValidator();
 
   /** つぶやきのサンプル本文(投稿時点)。 */
   public static final String POST_BODY_MORNING = "通勤中に近所の公園で桜が咲き始めているのを見つけた。今年も見られてよかった。";
@@ -42,12 +51,27 @@ public final class TestFixtures {
     return Clock.fixed(NOW, ZONE);
   }
 
+  /** {@link #NOW}をこのテストスイートの標準タイムゾーン({@link #ZONE})で解釈した日付。 */
+  public static LocalDate today() {
+    return NOW.atZone(ZONE).toLocalDate();
+  }
+
   public static User user() {
     return new User("hanako.tanaka@example.com", "$2a$10$dummyBcryptHashForTesting", NOW);
   }
 
   /** {@link #user()}が投稿した体で本文だけ差し替えたPostを組み立てる。 */
   public static Post post(String body) {
-    return new Post(user(), body, Instant.now());
+    return new Post(user(), body, NOW);
+  }
+
+  /** {@link #user()}が{@link #today()}に生成した体で本文だけ差し替えたDiaryを組み立てる。 */
+  public static Diary diary(String body) {
+    return new Diary(user(), today(), body, NOW);
+  }
+
+  /** Bean Validationの{@link ConstraintViolation}をValidatorFactoryのセットアップ抜きで検証する。 */
+  public static <T> Set<ConstraintViolation<T>> validate(T target) {
+    return VALIDATOR.validate(target);
   }
 }

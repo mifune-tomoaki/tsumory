@@ -106,3 +106,40 @@
 ### 影響範囲・残課題
 
 - `PostServiceTest`や`AnthropicDiaryWriterTest`など、他にも`new Post(TestFixtures.user(), body, ...)`という組み立てをローカルで行っている箇所があるが、今回は[refactor-tests.md](./refactor-tests.md)指摘1が指している`PostTest`/`AnthropicPostCategorizerTest`の重複解消にとどめた。他クラスへの展開、および対になる`TestFixtures.diary(String body)`の追加([refactor-tests.md](./refactor-tests.md)指摘2)は別途対応する。
+
+## [refactor-tests.md](./refactor-tests.md) 指摘2〜9: `domain`テスト群の残り指摘
+
+指摘1(`TestFixtures.post(...)`の追加)以降に残っていた指摘2〜9をまとめて対応した。指摘8は指摘7とセットで、指摘9はコード変更を伴わないためまとめて記録する。
+
+### 何が問題だったか
+
+- **指摘2**: `DiaryTest`には`PostTest`の`post(body)`に相当するファクトリヘルパーが無く、`new Diary(TestFixtures.user(), LocalDate.now(), body, Instant.now())`という組み立てをテストメソッドごとに直接書いていた。
+- **指摘3**: `TestFixtures.post(...)`(指摘1で追加した実装)を含め、`PostTest`/`DiaryTest`/`AnthropicPostCategorizerTest`が`Instant.now()`/`LocalDate.now()`という実時刻を使っており、`PostServiceTest`/`DiaryServiceTest`/`AnthropicDiaryWriterTest`が徹底している「`TestFixtures.fixedClock()`/`TestFixtures.NOW`で日時を固定する」規約から外れていた。
+- **指摘4**: `DiaryTest`が既存の`TestFixtures.DIARY_BODY_DRAFT`を使わず、`"今日は良い一日だった"`というその場限りの文字列を書いていた。
+- **指摘5**: `DiaryTest`の2メソッド(`rejectsBlankBody`/`acceptsNonBlankBody`)だけ、他クラス共通の`対象メソッド_期待する振る舞い`という命名規約から外れていた。
+- **指摘6**: `TestFixtures`のクラスコメントが「service層のユニットテストで使い回す」と書かれたままで、`domain`パッケージの`PostTest`/`DiaryTest`からも使われている実態と食い違っていた。
+- **指摘7**: `Diary.body`にはBean Validation(`@NotBlank`)を直接検証するテストがある一方、`Post.body`の`@NotBlank`/`@Size(max = 100)`には同等のテストが無く、カバレッジが非対称だった。
+- **指摘8**: 指摘7を採用すると、`Validation.buildDefaultValidatorFactory()`まわりの`@BeforeAll`/`@AfterAll`セットアップが`DiaryTest`/`PostTest`の2クラスに重複する。
+- **指摘9**: `PromptSanitizerTest.sanitize_neutralizesFakeDelimiterTags`と`PostTest.bodyForPrompt_neutralizesForgedDelimiterTagsRegardlessOfHowThePostWasBuilt`がほぼ同じ内容を検証しているが、意図(ユニットレベル検証 vs. 委譲配線の契約レベル検証)がコード上に書かれていなかった。
+
+### どう直したか
+
+1. `TestFixtures`に`diary(String body)`(`user()`/`today()`/`NOW`固定、本文だけ差し替え)を追加し、`DiaryTest`のインライン組み立てを置き換えた(指摘2)。
+2. `TestFixtures.post(...)`の内部実装を`Instant.now()`→`NOW`に変更。あわせて`TestFixtures.today()`(`NOW`を`ZONE`で解釈した`LocalDate`)を追加し、`diary(...)`もこれを使う形にした。これにより`PostTest`/`DiaryTest`は`TestFixtures`のファクトリ経由で自動的に固定クロック規約に揃う(指摘3)。
+3. `DiaryTest`の`"今日は良い一日だった"`を`TestFixtures.DIARY_BODY_DRAFT`に置き換えた(指摘4)。
+4. `DiaryTest`のテストメソッド名を`bodyValidation_rejectsBlankBody`/`bodyValidation_acceptsNonBlankBody`に変更し、他クラスの命名規約に揃えた(指摘5)。
+5. `TestFixtures`のクラスコメントを「テスト全体(domain/service層)で使い回す固定クロックとサンプルデータの生成ヘルパー。」に書き換えた(指摘6)。
+6. `PostTest`に`bodyValidation_rejectsBlankBody`/`bodyValidation_rejectsBodyLongerThan100Characters`/`bodyValidation_acceptsBodyWithin100Characters`を追加し、`Diary`側と同じ粒度でBean Validationを検証するようにした(指摘7)。
+7. `TestFixtures`に`public static <T> Set<ConstraintViolation<T>> validate(T target)`を追加し、`ValidatorFactory`/`Validator`を`TestFixtures`内で一度だけ構築するようにした。`DiaryTest`/`PostTest`双方から`@BeforeAll`/`@AfterAll`のセットアップを削除し、`TestFixtures.validate(...)`を呼ぶだけの形に揃えた(指摘8)。
+8. `PostTest.bodyForPrompt_neutralizesForgedDelimiterTagsRegardlessOfHowThePostWasBuilt`に、`PromptSanitizerTest`とほぼ同じ内容を検証している理由(単体ロジックの検証 vs. `Post.bodyForPrompt()`の委譲配線の検証)を一言コメントとして追記した(指摘9)。
+
+### どう検証したか
+
+- `TestFixturesTest`に`diary(...)`用のテスト(`diary_buildsADiaryWithTheGivenBodyOwnedByTheFixtureUserOnToday`)を追加し、`TestFixtures.diary(...)`が指定した本文・固定ユーザー・`TestFixtures.today()`を持つ`Diary`を返すことを確認。
+- `PostTest`/`DiaryTest`ともに`TestFixtures.validate(...)`経由のBean Validationテストが期待通り違反あり/なしを判定することを確認。
+- `./gradlew test`で全テスト(既存分含む)がパスすることを確認済み。
+
+### 影響範囲・残課題
+
+- `PostServiceTest`/`AnthropicDiaryWriterTest`など、`domain`テスト以外にもローカルで`Post`/`Diary`を組み立てている箇所は今回の対象外(指摘1解消時と同様、`refactor-tests.md`が指す`domain`テスト群の範囲にとどめた)。
+- `TestFixtures.VALIDATOR`は`ValidatorFactory`を明示的に閉じていない(テストプロセスの生存期間中だけ保持される想定)。テストスイート全体で1インスタンスを使い回す設計であり、JVM終了時に破棄されるためリークにはならない。
