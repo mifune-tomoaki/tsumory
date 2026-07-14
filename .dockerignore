@@ -1,0 +1,50 @@
+# --- Git / VCS ---
+.git
+.gitignore
+.gitattributes
+
+# --- Gradleのビルド成果物・キャッシュ ---
+# gradle/wrapper配下はDockerfileのビルドステージで必要なため除外しない。
+build
+.gradle
+out
+bin
+
+# --- IDE ---
+.idea
+*.iml
+*.ipr
+*.iws
+.vscode
+.settings
+.classpath
+.project
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- ログ・一時ファイル ---
+*.log
+*.tmp
+
+# --- Docker関連ファイル自体(イメージに含める必要がない) ---
+Dockerfile
+.dockerignore
+compose.yaml
+
+# --- ドキュメント・補助スクリプト(実行に不要) ---
+HELP.md
+docs
+scripts
+
+# --- Claude Code関連(実行に不要) ---
+.claude
+
+# --- 秘密情報・ローカル環境固有の設定 ---
+# .env: Anthropic APIキーなどの秘密情報。実行時は環境変数で注入する。
+.env
+.env.*
+# gradle.properties: ローカル開発機のJDKパス(org.gradle.java.home)を固定した設定。
+# コンテナ内のJDKパスとは一致しないため除外する。
+gradle.properties

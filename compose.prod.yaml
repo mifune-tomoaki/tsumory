@@ -1,0 +1,64 @@
+# 本番相当環境向けのCompose定義。
+#
+# compose.yaml(ローカル開発用、bootRun時にSpring Bootが自動起動するもの)とは別ファイル。
+#
+# 起動:
+#   postgresのみ:            docker compose -f compose.prod.yaml up -d
+#   appも含めて起動:          docker compose -f compose.prod.yaml --profile deploy up -d --build
+#
+# 環境変数はカレントディレクトリの.envファイル、またはホスト側の環境変数/
+# デプロイ先のSecrets機構から注入する(値をこのファイルにハードコードしない)。
+# POSTGRES_DB/USER/PASSWORDは.envがなくても動くようデフォルト値を持たせているが、
+# 実運用ではデフォルトのまま使わず必ず.envや環境変数で上書きすること。
+# ANTHROPIC_API_KEYはAPIキー(シークレット)のためデフォルト値を持たせていない
+# —— 未設定なら起動時にエラーで気づけるようにするため。
+#
+# プロジェクト名を明示的に分離している。指定しない場合、Docker Composeは
+# カレントディレクトリ名(このリポジトリでは"tsumory")をプロジェクト名として使うため、
+# compose.yaml(ローカル開発用)側のコンテナ・ボリュームと名前が衝突し、
+# 開発用DBコンテナを誤って巻き込んでrecreateしてしまう。
+name: tsumory-prod
+
+services:
+  app:
+    # 通常のdocker compose upでは起動しない(deployプロファイル指定時のみ起動する)。
+    # postgresだけを起動したい・appはCI/CDや別途ビルド済みイメージから起動したい場合を想定。
+    profiles: ["deploy"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tsumory:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        # コンテナの起動順序だけでなく、healthcheckでDB接続が受け付け可能になったことを待つ。
+        condition: service_healthy
+    environment:
+      # SPRING_PROFILES_ACTIVEは未設定のまま(defaultプロファイル)にする。
+      # devプロファイル(application-dev.yaml)はSQLバインド値をログ出力するため本番では絶対に有効化しない。
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tsumory}"
+      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-myuser}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:-secret}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}"
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: "postgres:16-alpine"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-tsumory}"
+      POSTGRES_USER: "${POSTGRES_USER:-myuser}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-secret}"
+    # ホストへのポート公開はしない。appサービスからはCompose内部ネットワーク経由でのみ到達可能。
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  # docker compose downではこのボリュームは削除されない(-v指定時のみ削除される)。
+  db-data:

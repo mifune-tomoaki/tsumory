@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileJava)",
+      "Bash(./gradlew bootRun)",
+      "Bash(./gradlew test)",
+      "Bash(./gradlew build)",
+      "Bash(curl -s http://localhost:*)",
+      "Bash(curl -sv http://localhost:*)"
+    ]
+  }
+}

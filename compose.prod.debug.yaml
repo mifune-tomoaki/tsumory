@@ -1,0 +1,27 @@
+# compose.prod.yaml(本番相当環境)のDBをブラウザで確認するための一時的なオーバーライド。
+# 本番環境には絶対に適用しないこと(pgAdminと管理用アカウントを追加で公開するため)。
+#
+# 使い方:
+#   docker compose -f compose.prod.yaml -f compose.prod.debug.yaml --profile deploy up -d
+#
+# pgAdminはCompose内部ネットワーク経由でpostgresサービスに接続するため、
+# postgres自体の5432番ポートをホストに公開する必要はない(compose.prod.yaml側の
+# 「DBポートは外部公開しない」という方針を崩さない)。
+services:
+  pgadmin:
+    image: "dpage/pgadmin4:latest"
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL:-admin@example.com}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD:-admin}"
+    ports:
+      # devのpgAdmin(5050番)と衝突しないよう5051番を使う。
+      - "5051:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+volumes:
+  pgadmin-data:
